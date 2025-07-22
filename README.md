@@ -100,6 +100,7 @@ In the cell below, load `heroes_information.csv` as `heroes_df`:
 
 ```python
 # Your code here
+heroes_df=pd.read_csv("heroes_information.csv")
 
 heroes_df.head()
 ```
@@ -114,7 +115,8 @@ There are two ways to do this:
 
 ```python
 # Your code here
-
+heroes_df=pd.read_csv("heroes_information.csv",index_col=0)
+#heroes_df = heroes_df.drop("Unnamed: 0", axis=1)
 heroes_df.head()
 ```
 
@@ -158,6 +160,7 @@ In the cell below, inspect the overall shape of the dataframe:
 
 ```python
 # Your code here
+heroes_df.shape
 ```
 
 Now let's look at the info printout:
@@ -174,7 +177,9 @@ In the cell below, interpret that information. Do the data types line up with wh
 ```python
 # Replace None with appropriate text
 """
-None
+There are missing values in two columns:
+Publisher: has 719 non-null values, meaning 15 entries are missing.
+Weight: has 732 non-null values, meaning 2 entries are missing.
 """
 ```
 
@@ -185,6 +190,9 @@ Now, repeat the same process with `super_hero_powers.csv`. Name the dataframe `p
 
 ```python
 # Your code here (create more cells as needed)
+powers_df = pd.read_csv("super_hero_powers.csv",index_col=0)
+powers_df.head()
+
 ```
 
 The following code will check if it was loaded correctly:
@@ -250,7 +258,18 @@ Write your answer below, and explain how it relates to the information we have:
 ```python
 # Replace None with appropriate text
 """
-None
+The 'Publisher' column has only 15 missing values out of 734. 
+Instead of dropping those rows, we can fill them with "Unknown" 
+to preserve the rest of the data. T
+By doing this approach keeps our dataset complete and avoids losing useful information.
+"""
+
+"""
+The 'Publisher' column has 15 missing values out of 734. 
+Since this is a small portion of the dataset, we can drop those rows 
+without significantly affecting our analysis. 
+This helps ensure our dataset is clean and free of missing values, 
+especially if we need to perform operations that require complete data.
 """
 ```
 
@@ -259,6 +278,9 @@ Now, implement the strategy to drop rows with missing values using code. (You ca
 
 ```python
 # Your code here
+heroes_df = heroes_df.dropna()
+#heroes_df.shape
+
 ```
 
 Now there should be no missing values in the publisher column:
@@ -289,7 +311,11 @@ Identify those two cases below:
 ```python
 # Replace None with appropriate text
 """
-None
+The two cases of inconsistent publisher naming are:
+
+1. "Marvel Comics" and "Marvel" – These should be combined as they refer to the same publisher.
+2. "DC Comics" and " DC Comics" – The second entry has a leading space and should be cleaned to match the first.
+
 """
 ```
 
@@ -298,6 +324,12 @@ Now, write some code to handle these cases. If you're not sure where to start, l
 
 ```python
 # Your code here
+# Strip leading/trailing spaces
+heroes_df["Publisher"] = heroes_df["Publisher"].str.strip()
+# Replace 'Marvel' with 'Marvel Comics'
+heroes_df["Publisher"] = heroes_df["Publisher"].replace("Marvel", "Marvel Comics")
+# Replace any remaining 'DC Comics' variants with consistent name
+heroes_df["Publisher"] = heroes_df["Publisher"].replace("DC Comics", "DC Comics")
 ```
 
 Check your work below:
@@ -366,7 +398,9 @@ In the cell below, identify the shared key, and your strategy for joining the da
 ```python
 # Replace None with appropriate text
 """
-None
+The shared key is 'name'.
+We'll use a left join because we want to preserve all rows from heroes_df . 
+After joining, each record will represent one hero with their attributes and powers.
 """
 ```
 
@@ -377,6 +411,36 @@ In the cell below, create a new dataframe called `heroes_and_powers_df` that con
 
 ```python
 # Your code here (create more cells as needed)
+
+#  Removes any leading or trailing spaces from each name and Converts the name to lowercase 
+heroes_df['name'] = heroes_df['name'].str.strip().str.lower()
+
+# transposed powers_df ,,flipping rows and columns 
+transposed_powers = powers_df.T
+
+# Cleaning and Removes any leading or trailing spaces from each name and Converts the name to lowercase 
+transposed_powers.index = transposed_powers.index.str.strip().str.lower()
+
+# Filter and merge the  transposed version with .T
+filtered_heroes_df = heroes_df[heroes_df['name'].isin(transposed_powers.index)]
+
+# Perform the merge without changing the global powers_df like the whole data 
+heroes_and_powers_df = filtered_heroes_df.merge(transposed_powers, how='left', left_on='name', right_index=True)
+
+print(heroes_and_powers_df.shape)  # (647, ...)
+
+
+#print(heroes_and_powers_df)
+#heroes_df = heroes_df[heroes_df['name'].isin(powers_df.index)]
+#heroes_and_powers_df = heroes_df.merge(powers_df, how='left', left_on='name', right_index=True)
+#heroes_and_powers_df.head()
+#print(powers_df.index[:5])
+#powers_df = powers_df.transpose()
+#print(heroes_df.shape)
+#print(powers_df.shape)
+# Filter heroes_df to only those with names in powers_df index
+# Normalize both sides for safer matching
+#powers_df = powers_df.T
 ```
 
 Run the code below to check your work:
@@ -551,6 +615,37 @@ Don't worry if the rows or columns are in a different order, all that matters is
 
 ```python
 # Your code here (create more cells as needed)
+#Skips the first 7 columns (usually metadata like name, Gender, Race, etc.)
+#Checks if all those values are either 0 or 1 only.
+superpower_cols = [
+    col for col in heroes_and_powers_df.columns[7:] 
+    if set(heroes_and_powers_df[col].dropna().unique()).issubset({0, 1})#unique non-null values in that column.
+]
+
+# Count superpowers for each publisher
+dc_counts = heroes_and_powers_df[heroes_and_powers_df['Publisher'] == 'DC Comics'][superpower_cols].sum()
+marvel_counts = heroes_and_powers_df[heroes_and_powers_df['Publisher'] == 'Marvel Comics'][superpower_cols].sum()
+
+# Create final DataFrame
+question_3_df = pd.DataFrame({
+    'Superpower Name': superpower_cols,
+    'DC Comics': dc_counts.values,
+    'Marvel Comics': marvel_counts.values
+})
+
+# Convert counts to integers
+question_3_df['DC Comics'] = question_3_df['DC Comics'].astype(int)
+question_3_df['Marvel Comics'] = question_3_df['Marvel Comics'].astype(int)
+
+# Show shape (should be 167)
+print(question_3_df.shape)
+
+# Print the result
+print(question_3_df.head())
+#want to print a specific row
+#question_3_df[question_3_df['Superpower Name'] == 'Molecular Dissipation']
+
+
 ```
 
 The code below checks that you have the correct dataframe structure:
@@ -632,8 +727,9 @@ Explain your question below:
 ```python
 # Replace None with appropriate text:
 """
-None
+Which is the most common eye color among superheroes?
 """
+
 ```
 
 Some sample cells have been provided to give you room to work. Feel free to create more cells as needed.
@@ -644,28 +740,31 @@ Be sure to include thoughtful, well-labeled visualizations to back up your analy
 
 
 ```python
+# list of known "missing" eye color representations and filtering them 
+invalid_eye_colors = ["", " ", "-", "unknown", "Unknown", "None", "none", "nan", "N/A", "NaN"]
+
+# Clean the Eye color column
+clean_eyes = heroes_and_powers_df["Eye color"].dropna().astype(str).str.strip()
+
+# Remove invalid values /~ tilde inverts the boolean values true/ false 
+#Tells pandas give me everything that’s not in the list of invalid values
+clean_eyes = clean_eyes[~clean_eyes.isin(invalid_eye_colors)]
+
+# Get top 5 most common eye colors
+eye_color_counts = clean_eyes.value_counts().head(5)
+
+# Plot
+plt.figure(figsize=(8, 5))
+eye_color_counts.plot(kind="bar", color="teal")
+plt.title("Top 5 Most Common Eye Colors Among Superheroes")
+plt.ylabel("Number of Heroes")
+plt.xlabel("Eye Color")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
 
 ```
 
-
-```python
-
-```
-
-
-```python
-
-```
-
-
-```python
-
-```
-
-
-```python
-
-```
 
 ## Summary
 
